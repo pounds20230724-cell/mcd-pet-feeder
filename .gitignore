@@ -1,0 +1,15 @@
+# 本地敏感配置，严禁提交
+mcp.json
+*.local
+.env
+.env.*
+
+# 系统/编辑器
+.DS_Store
+Thumbs.db
+
+# 运行产物
+__pycache__/
+node_modules/
+dist/
+*.log
