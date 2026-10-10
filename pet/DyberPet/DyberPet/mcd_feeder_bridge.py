@@ -48,13 +48,23 @@ class MCDFeederBridge(QObject):
         # 静音上游「App update available」更新提示（改造版版本号不随上游走）
         settings.UPDATE_NEEDED = False
 
-        # 轮询断点：首次接入跳过历史事件，只消费新事件
-        self._offset = self._load_offset()
+        # 事件幂等：按签名（ts+type+order_id）去重，文件重写/压缩也不会重放
+        # 首次启用 v2 幂等机制时，把当前历史全部标记为已处理（静默迁移，不弹旧气泡）
+        self._processed = set()
+        self._migrated = False
+        self._load_processed()
 
         self._timer = QTimer(self)
         self._timer.setInterval(1000)
         self._timer.timeout.connect(self._poll_events)
         self._timer.start()
+
+        # 气泡排队：同一 tick 多事件时按 1.4s 间隔依次弹出，避免轰炸
+        self._bubble_queue = []
+        self._bubble_timer = QTimer(self)
+        self._bubble_timer.setInterval(1400)
+        self._bubble_timer.timeout.connect(self._drain_bubbles)
+        self._bubble_timer.start()
 
         # 饱食度条（DP_HpBar）变化 → 写状态快照
         hp_bar = getattr(self.p, 'pet_hp', None)
@@ -70,23 +80,37 @@ class MCDFeederBridge(QObject):
         self.chat.bubble_emit = lambda text: self._bubble(
             f'mcd_chat_{uuid.uuid4().hex[:8]}', text)
 
-    # ---------------- 轮询断点 ----------------
+    # ---------------- 事件幂等与气泡节流 ----------------
 
-    def _load_offset(self):
+    def _load_processed(self):
         try:
             state = json.loads(BRIDGE_STATE.read_text(encoding='utf-8'))
-            return int(state.get('events_offset', 0))
+            self._processed = set(state.get('seen', []))
+            self._migrated = bool(state.get('seen'))
         except Exception:
-            if EVENTS_FILE.exists():
-                return EVENTS_FILE.stat().st_size  # 首次接入：跳过历史
-            return 0
+            self._processed, self._migrated = set(), False
 
-    def _save_offset(self, offset):
+    def _save_processed(self):
         try:
+            sigs = list(self._processed)[-400:]  # 只保留最近 400 条签名
             BRIDGE_STATE.write_text(
-                json.dumps({'events_offset': offset}), encoding='utf-8')
+                json.dumps({'seen': sigs}), encoding='utf-8')
         except OSError:
             pass
+
+    @staticmethod
+    def _sig(ev):
+        return '|'.join(str(ev.get(k, '')) for k in ('ts', 'type', 'order_id'))
+
+    def _drain_bubbles(self):
+        if not self._bubble_queue:
+            return
+        btype, msg = self._bubble_queue.pop(0)
+        try:
+            self.p.bubble_manager.register_bubble.emit(
+                {'bubble_type': btype, 'icon': 'system', 'message': msg})
+        except Exception:
+            traceback.print_exc()
 
     # ---------------- 直聊 ----------------
 
@@ -203,29 +227,34 @@ class MCDFeederBridge(QObject):
     # ---------------- 事件轮询 ----------------
 
     def _poll_events(self):
+        if not EVENTS_FILE.exists():
+            return
         try:
-            if not EVENTS_FILE.exists():
-                return
-            size = EVENTS_FILE.stat().st_size
-            if size < self._offset:  # 文件被重置/轮转
-                self._offset = 0
-            if size == self._offset:
-                return
-            with open(EVENTS_FILE, 'r', encoding='utf-8') as f:
-                f.seek(self._offset)
-                new_text = f.read()
-                self._offset = f.tell()
-            self._save_offset(self._offset)
+            lines = [l.strip() for l in
+                     EVENTS_FILE.read_text(encoding='utf-8').splitlines() if l.strip()]
         except OSError:
             return
-        for line in new_text.splitlines():
-            line = line.strip()
-            if not line:
-                continue
+        pending = []
+        for line in lines:
             try:
-                self._dispatch(json.loads(line))
+                ev = json.loads(line)
             except json.JSONDecodeError:
                 continue  # 半行/脏数据，跳过
+            sig = self._sig(ev)
+            if not self._migrated:
+                # 静默迁移：把既有历史标记为已处理，不弹旧气泡
+                self._processed.add(sig)
+                continue
+            if sig in self._processed:
+                continue
+            self._processed.add(sig)
+            pending.append(ev)
+        if not pending:
+            return
+        self._save_processed()
+        for ev in pending:
+            try:
+                self._dispatch(ev)
             except Exception:
                 traceback.print_exc()
 
@@ -244,11 +273,7 @@ class MCDFeederBridge(QObject):
     # ---------------- 动作实现 ----------------
 
     def _bubble(self, btype, message):
-        try:
-            self.p.bubble_manager.register_bubble.emit(
-                {'bubble_type': btype, 'icon': 'system', 'message': message})
-        except Exception:
-            traceback.print_exc()
+        self._bubble_queue.append((btype, message))
 
     def _notify_ordered(self, ev):
         """订单已创建【待支付】：提示去付款，含截止时间"""
