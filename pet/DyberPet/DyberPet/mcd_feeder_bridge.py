@@ -38,6 +38,8 @@ class MCDFeederBridge(QObject):
     def __init__(self, pet_widget, parent=None):
         super().__init__(parent)
         self.p = pet_widget
+        # 静音上游「App update available」更新提示（改造版版本号不随上游走）
+        settings.UPDATE_NEEDED = False
         self._offset = 0
         self._streak = 0
         self._last_fed = None
