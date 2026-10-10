@@ -218,7 +218,7 @@ create-order 成功 ──▶ ordered（待支付）──▶ 用户支付 ─�
 | `diary.md` | Skill 在每次 `fed` 后**全量重写** | 人读版吃麦日记：本月单量/支出/券省/streak/Top3，结论先行表格化 |
 | `stats.json` | Skill 在每次 `fed` 后重写 | 机器读：`{"month":"2026-10","orders":3,"spend":88,"saved":12,"streak":2,"top":[{"name":"汉堡","qty":2}]}` |
 
-桌宠端只读事件流水做聊天摘要，不写 `diary.md`/`stats.json`。每次 fed 后主动把 diary.md 最新结论用一句话告知用户（如「📄 吃麦日记已更新：本月 1 单 ¥24，连吃 1 天」）。
+桌宠端只读事件流水做聊天摘要，不写 `diary.md`/`stats.json`。每次 fed 后主动把 diary.md 最新结论用一句话告知用户（如「📄 吃麦日记已更新：本月 1 单 ¥24，连吃 1 天」）。**聚合时必须按 order_id 去重**（同一订单可能因重试产生多条 ordered）。
 
 ---
 

@@ -128,9 +128,10 @@ class MCDFeederBridge(QObject):
             pass
 
     def _stats_summary(self):
-        """吃麦日记摘要（供桌宠聊天直接问答；人读版 diary.md 由 Skill 生成）"""
+        """吃麦日记摘要（供桌宠聊天直接问答；人读版 diary.md 由 Skill 生成）。按 order_id 去重。"""
         if not EVENTS_FILE.exists():
             return '日记本还是空的，投喂第一单就开始记录啦~'
+        seen = set()
         orders = fed = spend = saved = 0
         streak = 0
         top = {}
@@ -141,6 +142,10 @@ class MCDFeederBridge(QObject):
                 continue
             t = ev.get('type')
             if t == 'ordered':
+                oid = ev.get('order_id')
+                if oid in seen:
+                    continue
+                seen.add(oid)
                 orders += 1
                 spend += float(ev.get('amount', 0) or 0)
                 saved += float(ev.get('saved', 0) or 0)
