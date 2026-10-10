@@ -19,7 +19,7 @@ description: 麦门饲养员——桌宠投喂点餐助手。当用户说"喂它
 
 每次被触发，先读桌宠状态文件（若存在）：
 
-- 读取 `~/.mcd-pet-feeder/pet_hunger.json`
+- 读取 `~/.mcd-pet-feeder/pet_hunger.json`（由桌宠端桥接模块写入：饱食度=桌宠 HP 条，0–100）
   - `satiety`：饱食度 0–100；`state`：calm / craving / hungry / alert
   - `streak`：连吃天数；`last_fed`：上次投喂时间
 - 文件不存在 → 桌宠离线，按"桌宠缺席模式"运行：不输出桌宠状态，只响应用户直接需求（功能完整可用）
@@ -184,7 +184,7 @@ description: 麦门饲养员——桌宠投喂点餐助手。当用户说"喂它
 写入时机：
 
 - `ordered`：create-order 成功后（channel: pickup / delivery / drive_through / reservation；saved 为券抵扣合计，无券为 0）
-- `fed`：用户说"吃上了/投喂"后（satiety_delta 按档位：正餐 50 / 小食 20 / 饮料甜点 15；streak：与 last_fed 相邻自然日连续则 +1，否则重置 1）
+- `fed`：用户说"吃上了/投喂"后（satiety_delta 按档位：正餐 50 / 小食 20 / 饮料甜点 15；streak：与 last_fed 相邻自然日连续则 +1，否则重置 1；**item**：写对应食物道具名——正餐/犒劳→"汉堡"、小食→"薯条"、明确是炸鸡类→"炸鸡"，桌宠端（DyberPet 底座）用该名字直接触发进食）
 
 规则：只追加不改写；时间戳用本地时区 ISO 格式；订单取消时追加 `{"type":"cancelled","order_id":"..."}`，由桌宠侧决定是否回滚动画。字段缺失不要编造，宁可少写。
 

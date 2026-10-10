@@ -2,7 +2,7 @@
 
 > **会饿的桌宠，用麦门投喂。** 你的 macOS 桌宠到饭点会乞食，你对 WorkBuddy 说一句话完成点餐，餐到投喂，吃麦全记录。
 
-**麦当劳程序员创意开发大赛（2026 M-CODE）参赛作品** · 基于 [麦当劳中国官方 MCP](https://github.com/M-China/mcd-mcp-server) · 桌宠端基于 WorkBuddyPet 开发
+**麦当劳程序员创意开发大赛（2026 M-CODE）参赛作品** · 基于 [麦当劳中国官方 MCP](https://github.com/M-China/mcd-mcp-server) · 桌宠端基于 [DyberPet](https://github.com/ChaozhongLiu/DyberPet)（GPL-3.0）改造
 
 <!-- 📹 首屏 GIF 占位：乞食气泡 → 对话下单 → 桌宠吃汉堡动画（P3 录制后替换） -->
 
@@ -10,7 +10,7 @@
 
 桌宠类应用有一个共同的缺陷：**它们只是桌面上的一张图**。麦门饲养员给它装上一个真的会饿的胃，和一条真的能买到饭的通道：
 
-- **情感层（桌宠 WorkBuddyPet）**：内置饥饿状态机，饱食度随时间衰减、饭点加速。饿了会弹气泡乞食——点一下气泡，直接唤起 WorkBuddy 对话。
+- **情感层（桌宠 DyberPet + 饲养员桥接）**：内置饥饿数值系统（HP 条即饱食度，随时间衰减）。饿了会弹气泡乞食——对 WorkBuddy 说一句话完成投喂闭环。
 - **决策层（本 Skill）**：读懂桌宠的饥饿状态和你的口语需求（"健身呢少吃点" / "饿死了来顿大的"），在热量预算内生成搭配方案，查券、算价、下单、跟踪订单。
 - **能力层（麦当劳官方 MCP）**：门店、菜单、优惠券、价格计算、下单支付、营养数据，全部来自官方接口。
 
@@ -62,7 +62,14 @@ cp -r skill ~/.workbuddy/skills/mcd-pet-feeder
 
 ### 3.（可选）桌宠端联动
 
-将 `pet/` 下的增量模块并入你的 WorkBuddyPet 项目（详见 [docs/protocol.md](./docs/protocol.md)）。没有桌宠也能完整使用本 Skill 的全部点餐功能——桌宠联动是增量彩蛋，不是前置依赖。
+桌宠端基于开源框架 [DyberPet](https://github.com/ChaozhongLiu/DyberPet)（GPL-3.0）改造，通过桥接模块与 Skill 交换事件（详见 [pet/README.md](./pet/README.md) 与 [docs/protocol.md](./docs/protocol.md)）：
+
+```bash
+pip install PySide6 tendo apscheduler pynput PySide6-Fluent-Widgets
+python pet/DyberPet/run_DyberPet.py
+```
+
+没有桌宠也能完整使用本 Skill 的全部点餐功能——桌宠联动是增量彩蛋，不是前置依赖。
 
 ## 使用示例
 
@@ -103,11 +110,10 @@ Skill：🍔 投喂成功！饱食度 +50，连吃第 3 天。本月已省 ¥21�
 ├── workbuddy.md              # WorkBuddy 开发上下文（专项奖励核验用）
 ├── skill/SKILL.md            # 决策层：饲养员主逻辑
 ├── docs/protocol.md          # 桌宠 ↔ Skill 事件协议
-└── pet/                      # 桌宠端增量模块（WorkBuddyPet patch）
-    ├── hunger_machine.py     # 饥饿状态机
-    ├── feed_bubble.py        # 乞食气泡与唤起
-    ├── events_watcher.py     # 事件监听 → 动画调度
-    └── assets/               # 乞食/投喂动画帧（麦门限定皮肤）
+└── pet/                      # 桌宠端（基于 DyberPet GPL-3.0 改造）
+    ├── README.md             # 改造点说明与运行方法
+    └── DyberPet/             # 框架源码（含桥接模块 mcd_feeder_bridge.py）
+        └── ...
 ```
 
 ## 免责声明

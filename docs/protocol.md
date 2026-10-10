@@ -6,7 +6,7 @@
 
 | 文件 | 谁写 | 谁读 | 内容 |
 |---|---|---|---|
-| `~/.mcd-pet-feeder/pet_hunger.json` | 桌宠独占写 | Skill 只读 | 桌宠饥饿状态快照 |
+| `~/.mcd-pet-feeder/pet_hunger.json` | 桌宠独占写 | Skill 只读 | 桌宠饥饿状态快照（由 DyberPet 底座 + 桥接模块生成，饱食度=HP 条） |
 | `~/.mcd-pet-feeder/feed_events.jsonl` | Skill 独占写 | 桌宠只读 | 投喂事件流（追加式） |
 
 任一端缺席时另一端照常工作：
@@ -71,7 +71,8 @@ Skill 端**只追加**，一行一个 JSON 对象，UTF-8。桌宠端启动时�
 
 | 字段 | 说明 |
 |---|---|
-| order_id | 关联订单（可空：用户手动喂零食场景） |
+| order_id | 关联订单 |
+| item | 可选，食物道具名（汉堡/薯条/炸鸡）——桌宠端用它触发对应进食动画与数值；缺省时按 satiety_delta 兜底（≥50 汉堡，否则薯条） |
 | satiety_delta | 正餐 50 / 小食 20 / 饮料甜点 15 |
 | streak | Skill 按相邻自然日计算后的当前连吃天数 |
 
