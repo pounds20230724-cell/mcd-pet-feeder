@@ -147,6 +147,12 @@ Skill：🍔 投喂成功！饱食度 +50，连吃第 3 天。本月已省 ¥21�
         └── ...
 ```
 
+## 二次开发声明与许可
+
+- 本项目桌宠端**基于开源项目 [DyberPet](https://github.com/ChaozhongLiu/DyberPet)（v1.2.4，GPL-3.0，原作者 Chaozhong Liu）二次开发**，改造点为：事件桥接模块（`pet/DyberPet/DyberPet/mcd_feeder_bridge.py`）、桌宠直聊面板（`pet/DyberPet/DyberPet/pet_chat.py`）、启动接线与「麦门小狗」角色资源，其余为上游原始代码（`pet/DyberPet/LICENSE` 原样保留）
+- 依据 GPL-3.0 协议，本仓库整体以 **GPL-3.0** 开源（见 [LICENSE](./LICENSE)），在此感谢 DyberPet 作者与社区
+- Skill 决策层（`skill/SKILL.md`）与事件协议（`docs/protocol.md`）为本项目原创
+
 ## 免责声明
 
 本项目为参赛者独立开发的参赛作品，非麦当劳官方产品。输出仅供参考，不构成医疗、营养或其他专业建议；餐品信息、价格、营养数据及供应状态以麦当劳官方渠道实时结果为准。
