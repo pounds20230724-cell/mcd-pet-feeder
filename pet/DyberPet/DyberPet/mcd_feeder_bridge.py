@@ -235,6 +235,7 @@ class MCDFeederBridge(QObject):
         except OSError:
             return
         pending = []
+        changed = False
         for line in lines:
             try:
                 ev = json.loads(line)
@@ -244,14 +245,18 @@ class MCDFeederBridge(QObject):
             if not self._migrated:
                 # 静默迁移：把既有历史标记为已处理，不弹旧气泡
                 self._processed.add(sig)
+                changed = True
                 continue
             if sig in self._processed:
                 continue
             self._processed.add(sig)
+            changed = True
             pending.append(ev)
+        if changed:
+            self._migrated = True
+            self._save_processed()
         if not pending:
             return
-        self._save_processed()
         for ev in pending:
             try:
                 self._dispatch(ev)
