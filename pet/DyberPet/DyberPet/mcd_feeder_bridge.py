@@ -12,6 +12,7 @@
     * satiety 直接复用 DyberPet HP 条（0-100），四档状态映射与 Skill 端一致
 """
 import json
+import subprocess
 import time
 import traceback
 import uuid
@@ -25,6 +26,7 @@ from DyberPet.pet_chat import MCDPetChat
 FEED_DIR = Path.home() / '.mcd-pet-feeder'
 EVENTS_FILE = FEED_DIR / 'feed_events.jsonl'
 HUNGER_FILE = FEED_DIR / 'pet_hunger.json'
+REQUESTS_FILE = FEED_DIR / 'pet_requests.jsonl'
 
 # satiety_delta → 内置食物映射（底座自带「喵当劳」系列，无需新增素材）
 DELTA_ITEM = [(50, '汉堡'), (20, '薯条'), (0, '薯条')]
@@ -39,6 +41,7 @@ class MCDFeederBridge(QObject):
         self._offset = 0
         self._streak = 0
         self._last_fed = None
+        self._last_state = 'calm'
         FEED_DIR.mkdir(parents=True, exist_ok=True)
 
         self._timer = QTimer(self)
@@ -52,9 +55,12 @@ class MCDFeederBridge(QObject):
             hp_bar.hp_updated.connect(self._on_hp_updated)
         self._write_hunger(self._current_hp())
 
-        # 直聊模块（双击/右键菜单触发，回复经气泡展示）
+        # 直聊模块（右键菜单 Chat 触发；点单意图经 order_requested 落盘联动 Skill）
         self.chat = MCDPetChat(state_provider=self._chat_state)
         self.chat.reply_ready.connect(self._on_chat_reply)
+        self.chat.order_requested.connect(self.submit_order_request)
+        self.chat.bubble_emit = lambda text: self._bubble(
+            f'mcd_chat_{uuid.uuid4().hex[:8]}', text)
 
     # ---------------- 直聊 ----------------
 
@@ -63,13 +69,37 @@ class MCDFeederBridge(QObject):
 
     def _chat_state(self):
         return {'satiety': self._current_hp() or 50,
-                'state': 'calm',  # 由 _write_hunger 的映射反推成本高，聊天场景粗粒度即可
+                'state': self._last_state,
                 'streak': self._streak,
                 'last_fed': self._last_fed}
 
     def _on_chat_reply(self, reply):
         # 唯一 bubble_type 绕过同类型去重，保证连续对话每句都显示
         self._bubble(f'mcd_chat_{uuid.uuid4().hex[:8]}', f'🐼 {reply}')
+
+    def submit_order_request(self, food: str):
+        """点单联动：需求落盘 → 复制话术 → 拉起 WorkBuddy，由 Skill 完成真实下单"""
+        try:
+            FEED_DIR.mkdir(parents=True, exist_ok=True)
+            ev = {'ts': time.strftime('%Y-%m-%dT%H:%M:%S%z'),
+                  'type': 'order_request', 'item': food,
+                  'source': 'pet_chat'}
+            with open(REQUESTS_FILE, 'a', encoding='utf-8') as f:
+                f.write(json.dumps(ev, ensure_ascii=False) + '\n')
+        except OSError:
+            pass
+        hint = (f'📋 已记下：派蒙想吃「{food}」\n'
+                f'去 WorkBuddy 对饲养员说「帮它下单」就好～（话术已复制到剪贴板）')
+        self._bubble(f'mcd_req_{uuid.uuid4().hex[:8]}', hint)
+        try:
+            subprocess.run(['pbcopy'], input=f'饲养员，派蒙想吃「{food}」，帮它下单'.encode('utf-8'),
+                           check=False)
+        except Exception:
+            pass
+        try:
+            subprocess.Popen(['open', '-a', 'WorkBuddy'])
+        except Exception:
+            pass
 
     # ---------------- 饱食度快照 ----------------
 
@@ -94,6 +124,7 @@ class MCDFeederBridge(QObject):
             state = 'hungry'
         else:
             state = 'alert'
+        self._last_state = state
         data = {
             'satiety': int(satiety),
             'state': state,

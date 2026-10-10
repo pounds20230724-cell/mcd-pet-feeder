@@ -470,12 +470,6 @@ class PetWidget(QWidget):
         self.setCursor(self.cursor_user)
         super().leaveEvent(event)
 
-    def mouseDoubleClickEvent(self, event):
-        # mcd-pet-feeder: 双击桌宠打开直聊输入框
-        if event.button() == Qt.LeftButton:
-            self.toggle_chat.emit()
-        super().mouseDoubleClickEvent(event)
-
     def mousePressEvent(self, event):
         """
         鼠标点击事件

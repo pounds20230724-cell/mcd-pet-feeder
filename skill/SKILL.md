@@ -24,6 +24,14 @@ description: 麦门饲养员——桌宠投喂点餐助手。当用户说"喂它
   - `streak`：连吃天数；`last_fed`：上次投喂时间
 - 文件不存在 → 桌宠离线，按"桌宠缺席模式"运行：不输出桌宠状态，只响应用户直接需求（功能完整可用）
 
+**检查点单请求**：读取 `~/.mcd-pet-feeder/pet_requests.jsonl`（桌宠聊天写入的点单需求），对照 `~/.mcd-pet-feeder/skill_state.json` 里 Skill 自己记录的 `last_request_ts`（不存在视为空），把**未处理**的 `order_request` 事件主动报给用户：
+
+```text
+🐼 派蒙刚才在桌面上说想吃「汉堡」，要我现在下单吗？
+```
+
+用户同意 → 走 §5 点餐链路（按请求里的 item 定档位），完成后把本次最大 ts 写回 skill_state.json。用户拒绝 → 也写回 ts（标记已读，不再追问）。请求文件不存在或无新请求 → 静默跳过。
+
 状态含义与缺省策略：
 
 | state | satiety | 缺省推荐档位 |

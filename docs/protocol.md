@@ -8,6 +8,7 @@
 |---|---|---|---|
 | `~/.mcd-pet-feeder/pet_hunger.json` | 桌宠独占写 | Skill 只读 | 桌宠饥饿状态快照（由 DyberPet 底座 + 桥接模块生成，饱食度=HP 条） |
 | `~/.mcd-pet-feeder/feed_events.jsonl` | Skill 独占写 | 桌宠只读 | 投喂事件流（追加式） |
+| `~/.mcd-pet-feeder/pet_requests.jsonl` | 桌宠独占写 | Skill 只读 | 桌宠聊天发起的点单需求（追加式，Skill 处理后把 ts 记入自己的 skill_state.json） |
 
 任一端缺席时另一端照常工作：
 
@@ -84,7 +85,15 @@ Skill 端**只追加**，一行一个 JSON 对象，UTF-8。桌宠端启动时�
 
 桌宠端收到后回滚「等待投喂」表情，不回滚饱食度（尚未进食）。
 
-### 2.4 桌宠端行为映射
+### 2.4 order_request — 桌宠聊天点单（pet_requests.jsonl）
+
+```json
+{"ts":"2026-10-10T09:40:00+08:00","type":"order_request","item":"汉堡","source":"pet_chat"}
+```
+
+用户在桌宠聊天面板说「点个汉堡」或点「帮我点餐」时产生。Skill 在下次对话启动时读取未处理项，主动向用户确认后走真实点餐链路；`item` 与食物道具/档位对齐（汉堡=正餐、薯条=小食、炸鸡=犒劳）。
+
+### 2.5 桌宠端行为映射
 
 | 事件 | 桌宠动画/反馈 |
 |---|---|

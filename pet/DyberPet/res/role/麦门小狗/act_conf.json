@@ -1,0 +1,56 @@
+{
+  "default": {
+    "images": "mg",
+    "act_num": 1
+  },
+  "feed_1": {
+    "images": "mg",
+    "act_num": 2,
+    "frame_refresh": 0.35
+  },
+  "feed_2": {
+    "images": "mg",
+    "act_num": 2,
+    "frame_refresh": 0.35
+  },
+  "feed_3": {
+    "images": "mg",
+    "act_num": 2,
+    "frame_refresh": 0.35
+  },
+  "up": {
+    "images": "mg",
+    "act_num": 1
+  },
+  "down": {
+    "images": "mg",
+    "act_num": 1
+  },
+  "right_walk": {
+    "images": "mg",
+    "act_num": 1,
+    "frame_move": 2
+  },
+  "drag": {
+    "images": "mg",
+    "act_num": 1
+  },
+  "fall": {
+    "images": "mg",
+    "act_num": 1
+  },
+  "onfloor": {
+    "images": "mg",
+    "act_num": 1
+  },
+  "patpat": {
+    "images": "mg",
+    "act_num": 2,
+    "frame_refresh": 0.25
+  },
+  "delicious": {
+    "images": "mg",
+    "act_num": 2,
+    "frame_refresh": 0.3
+  }
+}
