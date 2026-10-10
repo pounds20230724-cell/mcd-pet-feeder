@@ -1,0 +1,92 @@
+{
+  "default": {
+    "images": "pm",
+    "act_num": 1,
+    "frame_refresh": 0.08
+  },
+  "up": {
+    "images": "pm",
+    "act_num": 1,
+    "frame_refresh": 0.08
+  },
+  "down": {
+    "images": "pm",
+    "act_num": 1,
+    "frame_refresh": 0.08
+  },
+  "left": {
+    "images": "pm",
+    "act_num": 1,
+    "frame_refresh": 0.08
+  },
+  "right": {
+    "images": "pm",
+    "act_num": 1,
+    "frame_refresh": 0.08
+  },
+  "drag": {
+    "images": "pm",
+    "act_num": 1,
+    "frame_refresh": 0.08
+  },
+  "fall": {
+    "images": "pm",
+    "act_num": 1,
+    "frame_refresh": 0.08
+  },
+  "onfloor": {
+    "images": "pm",
+    "act_num": 1,
+    "frame_refresh": 0.08
+  },
+  "on_floor": {
+    "images": "pm",
+    "act_num": 1,
+    "frame_refresh": 0.08
+  },
+  "patpat": {
+    "images": "pm",
+    "act_num": 1,
+    "frame_refresh": 0.08
+  },
+  "feed_1": {
+    "images": "pm",
+    "act_num": 1,
+    "frame_refresh": 0.08
+  },
+  "feed_2": {
+    "images": "pm",
+    "act_num": 1,
+    "frame_refresh": 0.08
+  },
+  "feed_3": {
+    "images": "pm",
+    "act_num": 1,
+    "frame_refresh": 0.08
+  },
+  "left_walk": {
+    "images": "pm",
+    "act_num": 1,
+    "frame_refresh": 0.08
+  },
+  "right_walk": {
+    "images": "pm",
+    "act_num": 1,
+    "frame_refresh": 0.08
+  },
+  "sleep": {
+    "images": "pm",
+    "act_num": 1,
+    "frame_refresh": 0.08
+  },
+  "fall_asleep": {
+    "images": "pm",
+    "act_num": 1,
+    "frame_refresh": 0.08
+  },
+  "angry": {
+    "images": "pm",
+    "act_num": 1,
+    "frame_refresh": 0.08
+  }
+}

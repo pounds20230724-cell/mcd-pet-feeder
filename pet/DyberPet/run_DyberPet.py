@@ -85,6 +85,13 @@ class DyberPetApp(QApplication):
         # Signal Links
         self.__connectSignalToSlot()
 
+        # mcd-pet-feeder: 双击/右键桌宠 → 直聊输入框
+        self.p.toggle_chat.connect(self.mcd_bridge.toggle_chat)
+
+        # mcd-pet-feeder: 演示模式（MCD_PETFEEDER_DEMO=1 时自动打开聊天并发言，用于自测/GIF 录制）
+        if os.environ.get('MCD_PETFEEDER_DEMO') == '1':
+            QTimer.singleShot(8000, lambda: self.mcd_bridge.chat.push_demo('你饿了吗？'))
+
     def __connectSignalToSlot(self):
         # Main Widget - others
         self.p.setup_notification.connect(self.note.setup_notification)

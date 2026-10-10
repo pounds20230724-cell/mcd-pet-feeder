@@ -14,11 +14,13 @@
 import json
 import time
 import traceback
+import uuid
 from pathlib import Path
 
 from PySide6.QtCore import QObject, QTimer
 
 import DyberPet.settings as settings
+from DyberPet.pet_chat import MCDPetChat
 
 FEED_DIR = Path.home() / '.mcd-pet-feeder'
 EVENTS_FILE = FEED_DIR / 'feed_events.jsonl'
@@ -49,6 +51,25 @@ class MCDFeederBridge(QObject):
         if hp_bar is not None and hasattr(hp_bar, 'hp_updated'):
             hp_bar.hp_updated.connect(self._on_hp_updated)
         self._write_hunger(self._current_hp())
+
+        # 直聊模块（双击/右键菜单触发，回复经气泡展示）
+        self.chat = MCDPetChat(state_provider=self._chat_state)
+        self.chat.reply_ready.connect(self._on_chat_reply)
+
+    # ---------------- 直聊 ----------------
+
+    def toggle_chat(self):
+        self.chat.toggle(self.p.pos())
+
+    def _chat_state(self):
+        return {'satiety': self._current_hp() or 50,
+                'state': 'calm',  # 由 _write_hunger 的映射反推成本高，聊天场景粗粒度即可
+                'streak': self._streak,
+                'last_fed': self._last_fed}
+
+    def _on_chat_reply(self, reply):
+        # 唯一 bubble_type 绕过同类型去重，保证连续对话每句都显示
+        self._bubble(f'mcd_chat_{uuid.uuid4().hex[:8]}', f'🐼 {reply}')
 
     # ---------------- 饱食度快照 ----------------
 

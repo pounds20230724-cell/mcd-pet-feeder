@@ -351,6 +351,7 @@ class DP_FvBar(QProgressBar):
 class PetWidget(QWidget):
     setup_notification = Signal(str, str, name='setup_notification')
     setup_bubbleText = Signal(dict, int, int, name="setup_bubbleText")
+    toggle_chat = Signal(name='toggle_chat')  # mcd-pet-feeder: 打开桌宠直聊输入框
     close_bubble = Signal(str, name="close_bubble")
     addItem_toInven = Signal(int, list, name='addItem_toInven')
     fvlvl_changed_main_note = Signal(int, name='fvlvl_changed_main_note')
@@ -469,13 +470,18 @@ class PetWidget(QWidget):
         self.setCursor(self.cursor_user)
         super().leaveEvent(event)
 
+    def mouseDoubleClickEvent(self, event):
+        # mcd-pet-feeder: 双击桌宠打开直聊输入框
+        if event.button() == Qt.LeftButton:
+            self.toggle_chat.emit()
+        super().mouseDoubleClickEvent(event)
+
     def mousePressEvent(self, event):
         """
         鼠标点击事件
         :param event: 事件
         :return:
         """
-        
         if event.button() == Qt.RightButton:
             # 打开右键菜单
             if settings.draging:
@@ -1011,6 +1017,9 @@ class PetWidget(QWidget):
         #self.StatMenu.addMenu(self.menu)
         self.StatMenu.addActions([
             #Action(FIF.MENU, self.tr('More Options'), triggered=self._show_right_menu),
+            # mcd-pet-feeder: 直聊入口
+            Action(QIcon(os.path.join(basedir, 'res/icons/system/bubble.svg')),
+                   self.tr('Chat'), triggered=lambda: self.toggle_chat.emit()),
             Action(QIcon(os.path.join(basedir,'res/icons/dashboard.svg')), self.tr('Dashboard'), triggered=self._show_dashboard),
             Action(QIcon(os.path.join(basedir,'res/icons/SystemPanel.png')), self.tr('System'), triggered=self._show_controlPanel),
         ])
