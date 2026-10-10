@@ -121,9 +121,10 @@ class MCDPetChat(QWidget):
     reply_ready = Signal(str)
     order_requested = Signal(str)   # 识别到点单意图 → 交给桥接层落盘并引导 WorkBuddy
 
-    def __init__(self, state_provider, parent=None):
+    def __init__(self, state_provider, stats_provider=None, parent=None):
         super().__init__(parent)
         self.state_provider = state_provider
+        self.stats_provider = stats_provider  # callable -> 吃麦日记摘要文本
         self.setWindowFlags(Qt.Tool | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
         self.setWindowTitle('麦门饲养员 · 派蒙')
 
@@ -227,7 +228,16 @@ class MCDPetChat(QWidget):
             return
         self.input.clear()
         self._append('user', text)
-        m = ORDER_PAT.search(text.lower())
+        low = text.lower()
+        # 吃麦日记直查（数据沉淀可随时问答）
+        if any(k in low for k in ['日记', '账单', '吃了多少', '花']):
+            if self.stats_provider:
+                self._append('pet', self.stats_provider())
+                self._bubble_after('📄 ' + self.stats_provider())
+            else:
+                self._append('pet', '日记本还没开通~')
+            return
+        m = ORDER_PAT.search(low)
         if m:
             food = m.group(2)
             self._append('pet', f'好耶！「{food}」已记到饲养员的小本本上 📋')

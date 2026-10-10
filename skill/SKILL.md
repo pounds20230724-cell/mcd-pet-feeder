@@ -168,9 +168,9 @@ description: 麦门饲养员——桌宠投喂点餐助手。当用户说"喂它
 
 ---
 
-## 7. 吃麦日记
+## 7. 吃麦日记（数据沉淀）
 
-用户问"吃麦日记/账单"时，聚合 `~/.mcd-pet-feeder/feed_events.jsonl`：
+数据沉淀三层：`feed_events.jsonl`（原始流水）→ `diary.md`（人读日报，每次 fed 后全量重写到 `~/.mcd-pet-feeder/diary.md`）→ `stats.json`（机器读摘要）。用户问"吃麦日记/账单"时，**优先展示 diary.md 的最新内容**，没有 diary.md 时现场聚合 feed_events.jsonl：
 
 - 本月：订单数、总支出、券节省累计、均价
 - 连吃 streak（当前/最长）
@@ -180,21 +180,43 @@ description: 麦门饲养员——桌宠投喂点餐助手。当用户说"喂它
 
 ---
 
-## 8. 事件落盘（给桌宠的信号）
+## 8. 事件落盘与支付状态机（给桌宠的信号）
 
-目录 `~/.mcd-pet-feeder/` 不存在则创建。**追加写** `feed_events.jsonl`，一行一个 JSON：
+目录 `~/.mcd-pet-feeder/` 不存在则创建。**追加写** `feed_events.jsonl`，一行一个 JSON。事件按支付状态机流转：
 
-```json
-{"ts":"2026-10-10T12:41:00+08:00","type":"ordered","order_id":"1030...","store_code":"1450713","store_name":"麦当劳上海黄浦华旭国际大厦餐厅","channel":"pickup","items":[{"name":"板烧鸡腿堡套餐","qty":1}],"amount":33.5,"saved":6.0}
-{"ts":"2026-10-10T13:05:00+08:00","type":"fed","order_id":"1030...","satiety_delta":50,"streak":3}
+```
+create-order 成功 ──▶ ordered（待支付）──▶ 用户支付 ──▶ paid（含取餐码）
+                                                        │ 用户吃完说「吃上了」
+                                                        ▼
+                                              fed（进食+数据沉淀） / cancelled
 ```
 
-写入时机：
+- `ordered`：create-order 成功后立即写。**气泡语义是「去付款」**，必须携带支付链接与截止时间：
 
-- `ordered`：create-order 成功后（channel: pickup / delivery / drive_through / reservation；saved 为券抵扣合计，无券为 0）
-- `fed`：用户说"吃上了/投喂"后（satiety_delta 按档位：正餐 50 / 小食 20 / 饮料甜点 15；streak：与 last_fed 相邻自然日连续则 +1，否则重置 1；**item**：写对应食物道具名——正餐/犒劳→"汉堡"、小食→"薯条"、明确是炸鸡类→"炸鸡"，桌宠端（DyberPet 底座）用该名字直接触发进食）
+```json
+{"ts":"...","type":"ordered","order_id":"...","store_code":"...","store_name":"...","channel":"pickup","items":[{"name":"麦辣鸡翅2块","qty":1}],"amount":24.0,"saved":0.0,"pay_url":"https://m.mcd.cn/mcp/scanToPay?orderId=...","pay_deadline":"13:54 前付款有效"}
+```
 
-规则：只追加不改写；时间戳用本地时区 ISO 格式；订单取消时追加 `{"type":"cancelled","order_id":"..."}`，由桌宠侧决定是否回滚动画。字段缺失不要编造，宁可少写。
+- `paid`：用户说「支付完成」→ **必须先 query-order 确认**（orderStatus 为 2/10 配餐中才算支付成功）→ 写入并**把取餐码返回给用户**：
+
+```json
+{"ts":"...","type":"paid","order_id":"...","pickup_code":"8848","store_name":"..."}
+```
+
+- `fed`：取餐吃完、用户说「吃上了」→ 写入（satiety_delta 按档位：正餐 50 / 小食 20 / 饮料甜点 15；streak 按相邻自然日 +1；**item**：正餐/犒劳→"汉堡"、小食→"薯条"、明确炸鸡类→"炸鸡"，桌宠端用它触发进食动画）
+- `cancelled`：取消订单后写入
+
+**红线**：未 query-order 确认支付成功前，禁止写 `paid`、禁止展示取餐码、禁止写 `fed`。支付超时（expirePayTime 已过仍未支付）→ query-order 确认 → 写 `cancelled` 并告知用户。
+
+### 8.1 数据沉淀（吃麦日记的三个载体）
+
+| 载体 | 写入方 | 说明 |
+|---|---|---|
+| `feed_events.jsonl` | Skill 追加 | 原始事件流水（唯一事实源） |
+| `diary.md` | Skill 在每次 `fed` 后**全量重写** | 人读版吃麦日记：本月单量/支出/券省/streak/Top3，结论先行表格化 |
+| `stats.json` | Skill 在每次 `fed` 后重写 | 机器读：`{"month":"2026-10","orders":3,"spend":88,"saved":12,"streak":2,"top":[{"name":"汉堡","qty":2}]}` |
+
+桌宠端只读事件流水做聊天摘要，不写 `diary.md`/`stats.json`。每次 fed 后主动把 diary.md 最新结论用一句话告知用户（如「📄 吃麦日记已更新：本月 1 单 ¥24，连吃 1 天」）。
 
 ---
 

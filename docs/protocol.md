@@ -1,14 +1,17 @@
-# 桌宠 ↔ Skill 事件协议 v1
+# 桌宠 ↔ Skill 事件协议 v1.1
 
-桌宠端（WorkBuddyPet）与 Skill 端之间通过**两个本地文件**通信，无网络依赖、无进程依赖。
+桌宠端（DyberPet + 饲养员桥接）与 Skill 端之间通过**本地文件**通信，无网络依赖、无进程依赖。
 
 ## 设计原则：单写者
 
 | 文件 | 谁写 | 谁读 | 内容 |
 |---|---|---|---|
 | `~/.mcd-pet-feeder/pet_hunger.json` | 桌宠独占写 | Skill 只读 | 桌宠饥饿状态快照（由 DyberPet 底座 + 桥接模块生成，饱食度=HP 条） |
-| `~/.mcd-pet-feeder/feed_events.jsonl` | Skill 独占写 | 桌宠只读 | 投喂事件流（追加式） |
+| `~/.mcd-pet-feeder/feed_events.jsonl` | Skill 独占写 | 桌宠只读 | 投喂事件流（追加式，含支付状态机） |
 | `~/.mcd-pet-feeder/pet_requests.jsonl` | 桌宠独占写 | Skill 只读 | 桌宠聊天发起的点单需求（追加式，Skill 处理后把 ts 记入自己的 skill_state.json） |
+| `~/.mcd-pet-feeder/bridge_state.json` | 桌宠独占写 | — | 桥接轮询断点（重启不重放历史事件） |
+| `~/.mcd-pet-feeder/diary.md` | Skill 独占写 | 人读 | 吃麦日记日报（每次 fed 后全量重写） |
+| `~/.mcd-pet-feeder/stats.json` | Skill 独占写 | 桌宠可读 | 吃麦统计摘要（机器读） |
 
 任一端缺席时另一端照常工作：
 
@@ -47,10 +50,10 @@
 
 Skill 端**只追加**，一行一个 JSON 对象，UTF-8。桌宠端启动时全量读入、运行中 tail 增量行。
 
-### 2.1 ordered — 下单成功
+### 2.1 ordered — 订单已创建【待支付】
 
 ```json
-{"ts":"2026-10-10T12:41:00+08:00","type":"ordered","order_id":"1030108270000795607354880945","store_code":"1450713","store_name":"麦当劳上海黄浦华旭国际大厦餐厅","channel":"pickup","items":[{"name":"板烧鸡腿堡套餐","qty":1}],"amount":33.5,"saved":6.0}
+{"ts":"2026-10-10T13:39:49+08:00","type":"ordered","order_id":"1030433270000754936107874883","store_code":"1450533","store_name":"麦当劳上海闵行区益梅路力波九坊餐厅","channel":"pickup","items":[{"name":"麦辣鸡翅2块","qty":1}],"amount":24.0,"saved":0.0,"pay_url":"https://m.mcd.cn/mcp/scanToPay?orderId=...","pay_deadline":"13:54 前付款有效"}
 ```
 
 | 字段 | 必填 | 说明 |
@@ -61,10 +64,28 @@ Skill 端**只追加**，一行一个 JSON 对象，UTF-8。桌宠端启动时�
 | store_code / store_name | ✅ | 门店编号/名称 |
 | channel | ✅ | pickup / drive_through / delivery / reservation |
 | items | ✅ | [{name, qty}]，name 用餐品展示名 |
-| amount | ✅ | 实付金额（元，已由分转换） |
+| amount | ✅ | 应付金额（元，已由分转换） |
 | saved | ✅ | 券抵扣合计（元），无券为 0 |
+| pay_url | 推荐 | 支付链接（H5），桌宠气泡引导付款 |
+| pay_deadline | 推荐 | 支付截止时间文案（如「13:54 前付款有效」） |
 
-### 2.2 fed — 投喂完成
+**桌宠气泡语义 = 「去付款」**：`🧾 订单已创建【待支付】：… ¥24 ⏰ 13:54 前完成支付 付完款跟饲养员说声「支付完成」`。此时尚未支付，禁止出现「取餐码」等成功字样。
+
+### 2.2 paid — 支付成功
+
+```json
+{"ts":"...","type":"paid","order_id":"1030433270000754936107874883","pickup_code":"8848","store_name":"麦当劳上海闵行区益梅路力波九坊餐厅"}
+```
+
+| 字段 | 说明 |
+|---|---|
+| order_id | 关联订单 |
+| pickup_code | 取餐码（query-order 返回；为空时回退展示 order_id） |
+| store_name | 门店名 |
+
+**写入前置条件（红线）**：Skill 必须先 query-order 确认 orderStatus ∈ {2 配餐中-已支付, 10 餐厅确认配餐中} 才能写 paid。桌宠气泡：`✅ 支付成功！取餐码【8848】📍 门店名 取到餐开吃后说声「吃上了」`。
+
+### 2.3 fed — 投喂完成
 
 ```json
 {"ts":"2026-10-10T13:05:00+08:00","type":"fed","order_id":"1030...","satiety_delta":50,"streak":3}
@@ -77,15 +98,15 @@ Skill 端**只追加**，一行一个 JSON 对象，UTF-8。桌宠端启动时�
 | satiety_delta | 正餐 50 / 小食 20 / 饮料甜点 15 |
 | streak | Skill 按相邻自然日计算后的当前连吃天数 |
 
-### 2.3 cancelled — 订单取消
+### 2.4 cancelled — 订单取消
 
 ```json
 {"ts":"...","type":"cancelled","order_id":"1030..."}
 ```
 
-桌宠端收到后回滚「等待投喂」表情，不回滚饱食度（尚未进食）。
+桌宠端收到后回滚「等待投喂」表情，不回滚饱食度（尚未进食）。支付超时未付（expirePayTime 已过）也走此事件。
 
-### 2.4 order_request — 桌宠聊天点单（pet_requests.jsonl）
+### 2.5 order_request — 桌宠聊天点单（pet_requests.jsonl）
 
 ```json
 {"ts":"2026-10-10T09:40:00+08:00","type":"order_request","item":"汉堡","source":"pet_chat"}
@@ -93,13 +114,27 @@ Skill 端**只追加**，一行一个 JSON 对象，UTF-8。桌宠端启动时�
 
 用户在桌宠聊天面板说「点个汉堡」或点「帮我点餐」时产生。Skill 在下次对话启动时读取未处理项，主动向用户确认后走真实点餐链路；`item` 与食物道具/档位对齐（汉堡=正餐、薯条=小食、炸鸡=犒劳）。
 
-### 2.5 桌宠端行为映射
+### 2.6 桌宠端行为映射
 
 | 事件 | 桌宠动画/反馈 |
 |---|---|
-| ordered | 切换「等待投喂」表情（盯着你看） |
+| ordered | 气泡「🧾 待支付 + 截止时间」（不做成功假象） |
+| paid | 气泡「✅ 支付成功！取餐码 XXXX」+ 切换「等待投喂」表情 |
 | fed | 播放吃汉堡动画（麦门限定皮肤帧）→ 饱食度 + delta → 气泡播报 streak/省钱战绩 |
-| cancelled | 回滚等待表情 |
+| cancelled | 气泡告知 + 回滚等待表情 |
+
+## 3. 数据沉淀
+
+三层载体（写入方唯一）：
+
+```
+feed_events.jsonl（Skill 追加，原始流水）
+        │ 每次 fed 后全量重写
+        ├──▶ diary.md   （Skill 写，人读日报：单量/支出/券省/streak/Top3，结论先行）
+        └──▶ stats.json （Skill 写，机器读：{month, orders, spend, saved, streak, top[]})
+```
+
+桌宠聊天问「日记/账单」时，桥接直接从事件流水现算摘要回答（只读，不写）。
 
 ---
 
